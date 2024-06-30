@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'taskup_api.apps.TaskupApiConfig',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'account_api',
