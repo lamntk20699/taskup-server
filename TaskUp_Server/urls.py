@@ -32,5 +32,5 @@ urlpatterns = [
     ),
     path('api/token/verify/', jwt_views.TokenVerifyView.as_view(), name ='token_verify'),
     path('api/users/', include('account_api.urls')),
-    # path('', include('account_api.urls')),
+    path('', include('taskup_api.urls')),
 ]
