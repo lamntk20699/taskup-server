@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from corsheaders.defaults import default_headers, default_methods
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,14 +39,49 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_extensions',
     'corsheaders',
-    'taskup_api.apps.TaskupApiConfig',
+    'taskup_api',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'account_api',
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
+
+# CORS_ALLOWED_ORIGINS = [
+#     "https://example.com",
+#     "https://sub.example.com",
+#     "http://localhost:5173",
+#     "http://127.0.0.1:5173",
+#     "http://127.0.0.1:9000",
+# ]
+
+# CORS_ALLOW_METHODS = (
+#     *default_methods,
+#     "DELETE",
+#     "GET",
+#     "OPTIONS",
+#     "PATCH",
+#     "POST",
+#     "PUT",
+# )
+
+# CORS_ALLOW_HEADERS = (
+#     *default_headers,
+#     "accept",
+#     "authorization",
+#     "content-type",
+#     "user-agent",
+#     "x-csrftoken",
+#     "x-requested-with",
+#     "Access-Control-Allow-Origin",
+#     "Access-Control-Allow-Headers",
+#     "access-control-allow-method",
+#     "Access-Control-Allow-Credentials"
+# )
+
+CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -56,6 +92,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 'taskup_api.middleware.TaskupHeaderMiddleware'
 ]
 
 REST_FRAMEWORK = {
@@ -98,12 +135,12 @@ DATABASES = {
     ### Apache
      'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'Eserver',
+        'NAME': 'taskup',
         'USER': 'root',
         'PASSWORD': '',
         'HOST': 'localhost',
         'PORT': '3306',
-        # 'OPTIONS': {'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"},
+        'OPTIONS': {'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"},
     }
 }
 

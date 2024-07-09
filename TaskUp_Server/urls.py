@@ -19,7 +19,7 @@ from django.urls import path, include
 from rest_framework_simplejwt import views as jwt_views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # path('admin/', admin.site.urls),
     path(
         'token/',
         jwt_views.TokenObtainPairView.as_view(),
