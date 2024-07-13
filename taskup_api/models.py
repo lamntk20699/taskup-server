@@ -1,8 +1,17 @@
+import random
 from django.db import models
 
+def generate_random_issue_id():
+    return str(random.randint(10**9, 10**10 - 1))
+
+def generate_random_user_id():
+    return str(random.randint(10**8, 10**9 - 1))
+
+def generate_project_id():
+    return str(random.randint(10**7, 10**8 - 1))
 # Create your models here.
 class MemberInfo(models.Model):
-    memberId = models.CharField(max_length=20, null=False, blank=False)
+    memberId = models.CharField(max_length=20, null=False, default=generate_random_user_id)
     fullName = models.CharField(max_length=2000, null=False, blank=False)
     account = models.CharField(max_length=20, null=False, blank=False)
     email = models.CharField(max_length=2000, blank=True, null=False, default='')
@@ -23,7 +32,7 @@ class MemberRole(models.Model):
         return f"{self.role}"
 
 class Project(models.Model):
-    projectId = models.CharField(max_length=20, null=False, blank=False)
+    projectId = models.CharField(max_length=20, null=False, default=generate_project_id)
     name = models.CharField(max_length=2000, null=False, blank=False)
     description = models.CharField(max_length=500, blank=True, default='')
     parentId = models.CharField(max_length=2000, blank=True, default='')
@@ -37,7 +46,7 @@ class Project(models.Model):
     key = models.CharField(max_length=20, blank=True, default=0)
 
 class Issue(models.Model):
-    issueId = models.CharField(max_length=20, null=False, blank=False)
+    issueId = models.CharField(max_length=20, null=False, default=generate_random_user_id)
     start = models.CharField(max_length=20, blank=True, default='0')
     end = models.CharField(max_length=20, blank=True, default='0')
     parentId = models.CharField(max_length=20, null=False, blank=True, default='')
@@ -58,6 +67,7 @@ class Issue(models.Model):
     timeDone = models.CharField(max_length=20, blank=True, default='0')
     timeTodo = models.CharField(max_length=20, blank=True, default='0')
     extend = models.CharField(max_length=500, blank=True, default='')
+    estimatePoint = models.DecimalField(blank=True, default=1.00, max_digits=5, decimal_places=2)
 
 # each issue in each projects
 class ProjectHasIssue(models.Model):
@@ -80,6 +90,9 @@ class IssueHasUser(models.Model):
     isSnoozed = models.BooleanField(blank=True, default=False)
     isArchived = models.BooleanField(blank=True, default=False)
     inInbox = models.BooleanField(blank=True, default=False)
+    inTodo = models.BooleanField(blank=True, default=False)
+    inMyIssue = models.BooleanField(blank=True, default=False)
+    lastseen = models.BooleanField(blank=True, default="0")
 
 class Label(models.Model):
     labelId = models.CharField(max_length=20, null=False, blank=False)
@@ -93,8 +106,9 @@ class HasLabel(models.Model):
 
 class IssueStatus(models.Model):
     statusId = models.CharField(max_length=20, null=False, blank=False)
-    type = models.CharField(max_length=2000)
-    description = models.CharField(max_length=500)
+    type = models.CharField(max_length=20)
+    name = models.CharField(max_length=200, null=False, blank=True, default="")
+    description = models.CharField(max_length=500, null=False, blank=True, default="")
     flow = models.CharField(max_length=2000)
 class Priority(models.Model):
     priorityId = models.CharField(max_length=20, null=False, blank=False)

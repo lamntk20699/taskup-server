@@ -1,4 +1,5 @@
 from django.db import models
+from django import forms
 # from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 
@@ -40,6 +41,8 @@ class UserAccount(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, max_length=255)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    account = models.CharField(max_length=20, default='')
+    # password = forms.CharField(widget=forms.PasswordInput)
 
     objects = UserAccountManager()
 

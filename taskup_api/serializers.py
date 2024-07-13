@@ -60,10 +60,22 @@ class IssueSerializer(serializers.ModelSerializer):
             'extend',
         )
 
-class HasUserSerializer(serializers.ModelSerializer):
+class HasIssueSerializer(serializers.ModelSerializer):
     class Meta:
         model = IssueHasUser
-        fields = ('userId', 'parentId')
+        fields = (
+            'userId',
+            'parentId',
+            "roles",
+            "snoozedFromTime",
+            "snoozedToTime",
+            "isSnoozed",
+            "isArchived",
+            "inInbox",
+            "inTodo",
+            "inMyIssue",
+            "lastseen",
+        )
 
 class LabelSerializer(serializers.ModelSerializer):
     class Meta:

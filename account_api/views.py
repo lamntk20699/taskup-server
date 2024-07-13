@@ -5,6 +5,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import UserCreateSerializer, UserSerializer
+from rest_framework_simplejwt import views as jwt_views
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from taskup_api.models import MemberInfo
 
 # Create your views here.
 class RegisterView(APIView):
@@ -20,7 +23,6 @@ class RegisterView(APIView):
         user = UserSerializer(user)
 
         return Response(user.data, status=status.HTTP_201_CREATED)
-
 
 class RetrieveUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -47,3 +49,19 @@ class LogoutView(APIView):
             return Response(status=status.HTTP_205_RESET_CONTENT)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+class ObtainTokenResponseView(jwt_views.TokenObtainPairView):
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        email = request.data.get('email')
+        userId = 'admin'
+
+        try:
+            serializer.is_valid(raise_exception=True)
+            memberInfo = MemberInfo.objects.filter(email=email)
+            if memberInfo.exists():
+                userId = memberInfo[0].memberId
+        except TokenError as e:
+            raise InvalidToken(e.args[0])
+
+        return Response({ "uName": email, "userId": userId, "token": serializer.validated_data["access"]}, status=status.HTTP_200_OK)

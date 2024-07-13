@@ -42,44 +42,40 @@ INSTALLED_APPS = [
     'django_extensions',
     'corsheaders',
     'taskup_api',
+    'account_api',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
-    'account_api',
 ]
 
-CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_ALLOW_ALL = True
 
-# CORS_ALLOWED_ORIGINS = [
-#     "https://example.com",
-#     "https://sub.example.com",
-#     "http://localhost:5173",
-#     "http://127.0.0.1:5173",
-#     "http://127.0.0.1:9000",
-# ]
+CORS_ALLOWED_ORIGINS = [
+    "https://example.com",
+    "https://sub.example.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:9000",
+]
 
-# CORS_ALLOW_METHODS = (
-#     *default_methods,
-#     "DELETE",
-#     "GET",
-#     "OPTIONS",
-#     "PATCH",
-#     "POST",
-#     "PUT",
-# )
+CORS_ALLOW_METHODS = (
+    *default_methods,
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+)
 
-# CORS_ALLOW_HEADERS = (
-#     *default_headers,
-#     "accept",
-#     "authorization",
-#     "content-type",
-#     "user-agent",
-#     "x-csrftoken",
-#     "x-requested-with",
-#     "Access-Control-Allow-Origin",
-#     "Access-Control-Allow-Headers",
-#     "access-control-allow-method",
-#     "Access-Control-Allow-Credentials"
-# )
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "Access-Control-Allow-Origin",
+    "Access-Control-Allow-Headers",
+    "Access-Control-Allow-Headers",
+    "access-control-allow-method",
+    "Access-Control-Allow-Credentials",
+    "CurrentUser-Id",
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -190,7 +186,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
 AUTH_USER_MODEL = "account_api.UserAccount"

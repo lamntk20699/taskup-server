@@ -2,13 +2,15 @@ from django.contrib.auth.password_validation import validate_password
 from django.core import exceptions
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-User = get_user_model()
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
+User = get_user_model()
 
 class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('first_name', 'last_name', 'email', 'password')
+        fields = ('first_name', 'last_name', 'email', 'account', 'password')
         def validate(self, data):
             user = User(**data)
             password = data.get('password')
@@ -25,6 +27,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
               first_name=validated_data['first_name'],
               last_name=validated_data['last_name'],
               email=validated_data['email'],
+              account=validated_data['account'],
               password=validated_data['password'],
             )
 
@@ -33,4 +36,16 @@ class UserCreateSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
   class Meta:
     model = User
-    fields = ('first_name', 'last_name', 'email',)
+    fields = ('first_name', 'last_name', 'email', 'account')
+
+class MyIssueTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        # Add custom claims
+        # token["name"] = "Testing"
+        setattr(token, "name", "Testing")
+        # ...
+
+        return token
