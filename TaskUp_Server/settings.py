@@ -171,6 +171,11 @@ USE_I18N = True
 
 USE_TZ = True
 
+# MQTT_SERVER = '1f95ee279e3f490699252fc099fdd07b.s1.eu.hivemq.cloud'
+# MQTT_PORT = 8884
+# MQTT_KEEPALIVE = 60
+# MQTT_USER = 'server'
+# MQTT_PASSWORD = ''
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/

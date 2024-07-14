@@ -1,16 +1,20 @@
 import json
 import random
 import datetime
-
+import re
 from urllib.parse import unquote
+from django.db.models import Q
 from django.contrib.auth import authenticate, login
 from django.contrib.sessions.models import Session
 from django.shortcuts import render
+from django.http import JsonResponse
 
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+
+# from TaskUp_Server.mqtt import client as mqtt_client
 
 from .models import (MemberInfo, Project, Issue, IssueHasUser, Label,
                      HasLabel, IssueStatus, Priority, Attachment, Comment,
@@ -20,12 +24,14 @@ from .serializers import (MemberSerializer, ProjectSerializer, IssueSerializer,
                           StatusSerializer, PrioritySerializer, AttachmentSerializer,
                           CommentSerializer, UserHasProjectSerializer)
 
-from .common_response import (response_success, response_create_object_success,
+from .common_response import (response_success, response_create_object_success, response_not_found,
                               response_invalidate_data, response_not_permit, response_conflict)
 
 from .data_resource import (get_label_and_hasLabel_response, get_user_and_hasUser_response,
                              get_issue_and_hasIssue_response, get_user_search_response,
-                             get_user_data)
+                             get_user_data, get_issue_search_response)
+
+# import pyrebase
 
 def generate_random_issue_id():
     return str(random.randint(10**9, 10**10 - 1))
@@ -52,6 +58,19 @@ COMPANY_ID = "71124658431777"
 DATA_TIME_FIELDS = ["start", "end", "timeDone", "timeTodo",
                  "lastUpdateTime", "createdTime", "lastseen",
                  "snoozedFromTime", "snoozedToTime"]
+
+# firebaseConfig = {
+#   "apiKey": "AIzaSyDcmoEkHQCC8h-yAVA13BW52j2LAo1U4zo",
+#   "authDomain": "task-up-rt.firebaseapp.com",
+#   "projectId": "task-up-rt",
+#   "storageBucket": "task-up-rt.appspot.com",
+#   "messagingSenderId": "388264302716",
+#   "appId": "1:388264302716:web:254f1dc354c32da3c7d1f9",
+#   "measurementId": "G-0TMX8RF71E"
+# }
+
+# firebase = pyrebase.initialize_app(firebaseConfig)
+# storage = firebase.storage()
 
 # Create your views here.
 class UserView(generics.CreateAPIView):
@@ -166,12 +185,15 @@ class IssueListView(generics.CreateAPIView):
             listIds = []
 
             for item in objectHasIssue:
-                issueId = item.issueId
+                if meId == objectId:
+                    issueId = item.parentId
+                else:
+                    issueId = item.issueId
                 if len(listHasLabelIssueIds) > 0:
                     if (issueId in listHasLabelIssueIds):
-                        listIds.append(item.issueId)
+                        listIds.append(issueId)
                 else:
-                    listIds.append(item.issueId)
+                    listIds.append(issueId)
             # Lọc issue trong project hoặc chứa meId
             filterParams['issueId__in'] = listIds
 
@@ -265,7 +287,7 @@ class IssueListView(generics.CreateAPIView):
                 "Label": labelData
             }
             return Response(dataResponse, status=status.HTTP_200_OK)
-        return Response({}, status=status.HTTP_204_NO_CONTENT)
+        return response_not_found()
 
     # Tạo việc mới
     def post(self, request, objectId):
@@ -365,12 +387,12 @@ class IssueListView(generics.CreateAPIView):
 
                     # Edge: creator
                     # userIds = requestData.get('HasIssue').get(objectId).get('itemIds')
-                    # userData = ["user.type.creator"]
-                    # if objectId == reporterId: userData.append("user.type.reporter")
-                    # if objectId == assigneeId: userData.append("user.type.assignee")
+                    userData = ["user.type.creator"]
+                    if objectId == reporterId: userData.append("user.type.reporter")
+                    if objectId == assigneeId: userData.append("user.type.assignee")
 
-                    # newUserData = IssueHasUser(userId=objectId, parentId=issueId, roles=json.dumps(userData))
-                    # newUserData.save()
+                    newUserData = IssueHasUser(userId=objectId, parentId=issueId, roles=json.dumps(userData))
+                    newUserData.save()
 
                     # Edge: HasIssue
                     if projectId != "" and int(projectId) > 0:
@@ -416,29 +438,37 @@ class IssueTodoView(generics.CreateAPIView):
     parent_id ="parentIds"
     assignee_ids = "assigneeIds"
     reporter_ids = "reporterIds"
+    priority_ids = "priorityIds"
+    label_ids = "labelIds"
+    has_deadline = "hasDeadline"
+    start_time = "startTime"
+    sort_by = "sortBy"
     limit = "limit"
     maxscore = "maxscore"
     minscore = "minscore"
     filter_list = ["statusTypes", "parentIds"]
 
     # GetList Todolist
-    # Chú ý logic phân biệt chi tiết issue và danh sách issue
-    def get(self, request, userMeId):
+    def get(self, request, meId):
         filterParams = {}
-        meId = "70506187193630"
         # unquote
         parentId = request.GET.get(self.parent_id)
         statusType = request.GET.get(self.status_type)
         assigneeIds = request.GET.get(self.assignee_ids)
         reporterIds = request.GET.get(self.reporter_ids)
+        labelIds = request.GET.get(self.label_ids)
+        priorityIds = request.GET.get(self.priority_ids)
+        hasDeadline = request.GET.get(self.has_deadline)
+        startTime = request.GET.get(self.start_time)
+        sortBy = request.GET.get(self.sort_by)
+
         # limit = request.GET.get(self.limit)
         # minscore = request.GET.get(self.minscore)
         # maxscore = request.GET.get(self.maxscore)
-        # temp = statusType.split(',')
-        # filterParams = {statusType}
 
         if parentId:
             filterParams['parentId__exact'] = parentId
+
         if statusType:
             issueStatusTypes = [int(x) for x in statusType.split(",")]
             statusInfo = IssueStatus.objects.filter(type__in=issueStatusTypes)
@@ -449,28 +479,47 @@ class IssueTodoView(generics.CreateAPIView):
                 filterParams['statusId__in'] = listStatusIds
 
         if assigneeIds:
-            issueAssigneeIds = [int(x) for x in assigneeIds.split(",")]
-            listAssigneeIds = []
-            for memId in issueAssigneeIds:
-                listAssigneeIds.append(memId)
-            filterParams['assigneeId__in'] = listAssigneeIds
+            issueAssigneeIds = assigneeIds.split(",")
+            filterParams['assigneeId__in'] = issueAssigneeIds
 
         if reporterIds:
-            issuereporterIds = [int(x) for x in reporterIds.split(",")]
-            listreporterIds = []
-            for memId in issuereporterIds:
-                listreporterIds.append(memId)
-            filterParams['reporterId__in'] = listreporterIds
-        # Sort with: order_by
-        # user = self.year
+            issueReporterIds = reporterIds.split(",")
+            # listReporterIds = []
+            # for memId in issueReporterIds:
+            #     listReporterIds.append(memId)
+            filterParams['reporterId__in'] = issueReporterIds
 
-        objectHasIssue = IssueHasUser.objects.filter(userId=userMeId)
+        listHasLabelIssueIds = []
+        if labelIds:
+            issueLabelFilterTypes = [int(x) for x in labelIds.split(",")]
+            hasLabelQueryset = HasLabel.objects.filter(labelId__in=issueLabelFilterTypes)
+            if hasLabelQueryset.exists():
+                for hasLabelData in hasLabelQueryset:
+                    listHasLabelIssueIds.append(hasLabelData.parentId)
+
+            # filterParams['issueId__in'] = listHasLabelIssueIds
+
+        if priorityIds:
+            issuePriorityFilterIds = priorityIds.split(",")
+            # listPriorityIds = []
+            # for priorityId in issuePriorityFilterIds:
+            #     listPriorityIds.append(priorityId)
+            filterParams['priorityId__in'] = issuePriorityFilterIds
+
+        if hasDeadline:
+            filterParams['end__gt'] = "0"
+
+        if startTime:
+            filterParams['timeTodo__gt'] = startTime
+
+        objectHasIssue = IssueHasUser.objects.filter(userId=meId)
 
         # dataResponse = {}
         hasIssueData = {}
         hasIssueItems = {}
         hasIssueIds = []
 
+        userData = {}
         hasUserData = {}
         hasLabelData = {}
         labelData = {}
@@ -480,10 +529,16 @@ class IssueTodoView(generics.CreateAPIView):
             listIds = []
 
             for item in objectHasIssue:
-                listIds.append(item.parentId)\
+                issueId = item.parentId
+                if len(listHasLabelIssueIds) > 0:
+                    if (issueId in listHasLabelIssueIds):
+                        listIds.append(issueId)
+                else:
+                    listIds.append(issueId)
             # Lọc issue trong project hoặc chứa meId
             filterParams['issueId__in'] = listIds
 
+            sortData = {}
             listIssue = Issue.objects.filter(**filterParams)
             if listIssue.exists():
                 for issueItems in listIssue:
@@ -496,24 +551,46 @@ class IssueTodoView(generics.CreateAPIView):
                     data = IssueSerializer(issueItems).data
                     issueId = issueItems.issueId
                     hasIssueIds.append(issueId)
+                    hasIssueItems[issueId] = {
+                        "data": {
+                            "inTodo": True,
+                        }
+                    }
                     issueData[issueId] = {
                         "data": data
                     }
                     issueData[issueId]['data']['id'] = issueId
                     for item in DATA_TIME_FIELDS:
-                        issueData[issueId]['data'][item] = int(data.get(item))
+                        if item in data.keys():
+                            issueData[issueId]['data'][item] = int(data.get(item))
+                            if sortBy == "end":
+                                issueDeadline = int(issueItems.end)
+                                if issueDeadline == 0:
+                                    sortData[issueId] = MAX_DATE_TIMESTAMP
+                                else:
+                                    sortData[issueId] = int(issueItems.end)
+                            elif sortBy == "priority":
+                                sortData[issueId] = int(issueItems.priorityId)
+                            else:
+                                sortData[issueId] = int(issueItems.lastUpdateTime)
 
                     ## user included in issue
-                    meRoleQueryset = IssueHasUser.objects.filter(userId=meId, parentId=issueId)
-                    if meRoleQueryset.exists():
-                        roles = json.loads(meRoleQueryset[0].roles)
-
-                    hasUserIds.append(meId)
-                    hasUserItem[issueId] = {
-                        "data": {
-                            "roles": roles
+                    userRoleQueryset = IssueHasUser.objects.filter(parentId=issueId)
+                    if userRoleQueryset.exists():
+                        for userRoleData in userRoleQueryset:
+                            roles = json.loads(userRoleData.roles)
+                            userId = userRoleData.userId
+                            hasUserIds.append(userId)
+                            hasUserItem[issueId] = {
+                                "data": {
+                                    "roles": roles
+                                    }
                             }
-                    }
+                            userData[userId] = get_user_data(userId)
+
+                    userData[userId] = get_user_data(issueItems.reporterId)
+                    if issueItems.assigneeId != "" and int(issueItems.assigneeId) > 0:
+                        userData[userId] = get_user_data(issueItems.assigneeId)
 
                     hasUserData[issueId] = {
                         "itemIds": hasUserIds,
@@ -536,21 +613,28 @@ class IssueTodoView(generics.CreateAPIView):
                         "items": {}
                     }
 
-            hasIssueData[userMeId] = {
-                "itemIds": hasIssueIds,
+            isReversed = False
+            if sortBy is None:
+                isReversed = True
+            sortedHasIssue = sorted(hasIssueIds, key=lambda x: sortData[x], reverse=isReversed)
+
+            hasIssueData[meId] = {
+                "itemIds": sortedHasIssue,
                 "total": len(hasIssueIds),
-                "items": {},
+                "items": hasIssueItems,
                 "older204": True
             }
             dataResponse = {
                 "Issue": issueData,
                 "HasTodo": hasIssueData,
+                "User": userData,
                 "HasUser": hasUserData,
                 "HasLabel": hasLabelData,
                 "Label": labelData
             }
             return Response(dataResponse, status=status.HTTP_200_OK)
-        return Response({}, status=status.HTTP_204_NO_CONTENT)
+        return Response(meId, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # return response_not_found()
 
 class IssueView(generics.CreateAPIView):
     serializer_class = IssueSerializer
@@ -891,7 +975,34 @@ class ProjectListView(generics.CreateAPIView):
 
 class ProjectView(generics.CreateAPIView):
     serializer_class = ProjectSerializer
+    def get(self, request, projectId):
+        try:
+            meId = request.POST.get('CurrentUser-Id')
+            project = Project.objects.get(projectId__exact=projectId)
+            projectInfo = self.serializer_class(project).data
 
+            projectData = {
+                projectId: {
+                    "data": projectInfo
+                },
+            }
+            projectData[projectId]['data']['id'] = project.projectId
+
+            hasProjectData = {
+                meId: {
+                    "itemIds": [projectId],
+                    "items": {
+                        "data": {}
+                    }
+                }
+            }
+            dataResponse = {
+                "Project": projectData,
+                "HasProject": hasProjectData,
+            }
+            return Response(dataResponse, status=status.HTTP_200_OK)
+        except:
+            return response_invalidate_data()
     # Cập nhật thông tin project
     def put(self, request, projectId):
         try:
@@ -985,11 +1096,12 @@ class LabelListView(generics.CreateAPIView):
                     newHasLabel.save()
 
                     dataResponse = {
+                        labelId: {
                         "offlineId": item,
                         "createdTime": str(timeNow),
                         "id": labelId,
-                    }
-                    return Response(dataResponse, status=status.HTTP_200_OK)
+                    }}
+                    return Response(dataResponse.values(), status=status.HTTP_200_OK)
 
             return Response({"error": "conflict"}, status=status.HTTP_409_CONFLICT)
 
@@ -1090,33 +1202,39 @@ class MemberListView(generics.CreateAPIView):
             listMemberId = requestData.get(objectId).get('itemIds')
             listMemberDeleteIds = requestData.get(objectId).get('deleteIds')
 
-            for memberId in listMemberDeleteIds:
-                hasProjectQueryset = UserHasProject.objects.filter(projectId=objectId, userId=memberId)
-                if hasProjectQueryset.exists():
-                    for member in hasProjectQueryset:
-                        member.delete()
-                hasIssueQueryset = IssueHasUser.objects.filter(parentId=objectId, userId=memberId)
-                if hasIssueQueryset.exists():
-                    for member in hasIssueQueryset:
+            if listMemberDeleteIds:
+                for memberId in listMemberDeleteIds:
+                    hasProjectQueryset = UserHasProject.objects.filter(projectId=objectId, userId=memberId)
+                    if hasProjectQueryset.exists():
+                        for member in hasProjectQueryset:
                             member.delete()
+                    hasIssueQueryset = IssueHasUser.objects.filter(parentId=objectId, userId=memberId)
+                    if hasIssueQueryset.exists():
+                        for member in hasIssueQueryset:
+                            roles = json.loads(member.roles)
+                            if ((len(roles) == 1) and ("user.type.watcher" in roles)) or (len(roles) < 1):
+                                member.delete()
+                            elif len(roles) > 1 and ("user.type.watcher" in roles):
+                                roles.pop("user.type.watcher")
 
-            for memberId in listMemberId:
-                roles = requestData.get(memberId).get("data").get('roles')
-                project = Project.objects.filter(projectId=objectId)
-                if project.exists():
-                        hasMemberQueryset = UserHasProject.objects.filter(projectId=objectId, userId=memberId)
-                        if hasMemberQueryset.exists():
-                            hasMemberData = hasMemberQueryset[0]
-                            hasMemberData.roles = json.dumps(roles)
-                            hasMemberData.save()
-                else:
-                    issue = Project.objects.get(issueId=objectId)
-                    if issue.exists():
-                        hasMemberQueryset = IssueHasUser.objects.filter(parentId=objectId, userId=memberId)
-                        if hasMemberQueryset.exists():
-                            hasMemberData = hasMemberQueryset[0]
-                            hasMemberData.roles = json.dumps(roles)
-                            hasMemberData.save()
+            if listMemberId:
+                for memberId in listMemberId:
+                    roles = requestData.get(memberId).get("data").get('roles')
+                    project = Project.objects.filter(projectId=objectId)
+                    if project.exists():
+                            hasMemberQueryset = UserHasProject.objects.filter(projectId=objectId, userId=memberId)
+                            if hasMemberQueryset.exists():
+                                hasMemberData = hasMemberQueryset[0]
+                                hasMemberData.roles = json.dumps(roles)
+                                hasMemberData.save()
+                    else:
+                        issue = Project.objects.get(issueId=objectId)
+                        if issue.exists():
+                            hasMemberQueryset = IssueHasUser.objects.filter(parentId=objectId, userId=memberId)
+                            if hasMemberQueryset.exists():
+                                hasMemberData = hasMemberQueryset[0]
+                                hasMemberData.roles = json.dumps(roles)
+                                hasMemberData.save()
             return response_success()
         except:
             return response_invalidate_data()
@@ -1161,17 +1279,56 @@ class UserSearchView(generics.CreateAPIView):
     key_search = "key"
     # Rời khỏi công việc
     def get(self, request, companyId):
-        searchKey = request.GET.get(self.key_search)
-        if not searchKey:
-            userQuery = MemberInfo.objects.all()
-        else:
-            userQuery = MemberInfo.objects.filter(fullName__icontains=searchKey)
-        if userQuery.exists():
-            dataResponse = get_user_search_response(userQuery)
-            return Response(dataResponse, status=status.HTTP_200_OK)
+        try:
+            searchKey = request.GET.get(self.key_search)
+            if not searchKey:
+                userQuery = MemberInfo.objects.all()
+            else:
+                userQuery = MemberInfo.objects.filter(fullName__icontains=searchKey)
+            if userQuery.exists():
+                dataResponse = get_user_search_response(userQuery)
+                return Response(dataResponse, status=status.HTTP_200_OK)
+            return response_not_found()
+        except:
+            return response_invalidate_data()
 
-        return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
+class IssueSearchView(generics.CreateAPIView):
+    query_params = "query"
+    def get(self, request, companyId):
+        # try:
+            requestQuery = request.GET.get(self.query_params)
+            companyId_match = re.search(r'companyId="([^"]+)"', requestQuery)
+            company_id = companyId_match.group(1)
 
+            userId_match = re.search(r'hasIssue.userId="([^"]+)"', requestQuery)
+            user_id = userId_match.group(1)
+
+            summary_match = re.search(r'summary~"([^"]+)"', requestQuery)
+            summary = summary_match.group(1)
+            description_match = re.search(r'description~"([^"]+)"', requestQuery)
+            description = description_match.group(1)
+
+            listSoftSearchIssue = []
+            issueWithWatcherQuery = IssueHasUser.objects.filter(userId=user_id)
+            if issueWithWatcherQuery.exists():
+                for hasUserIssue in issueWithWatcherQuery:
+                    listSoftSearchIssue.append(hasUserIssue.parentId)
+
+            issueQuery = Issue.objects.filter(
+                Q(issueId__in=listSoftSearchIssue) | Q(assigneeId=user_id) | Q(reporterId=user_id),
+                Q(description__icontains=description) | Q(summary__icontains=summary)
+            )
+
+            if issueQuery.exists():
+                dataResponse = get_issue_search_response(issueQuery)
+                return Response(dataResponse, status=status.HTTP_200_OK)
+
+            return response_not_found()
+        # except:
+        #     return response_invalidate_data()
 class UndefinedView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
+        # request_data = request.data
+        # rc, mid = mqtt_client.publish(request_data['topic'], request_data['msg'])
+        # return JsonResponse({'code': rc})
         return Response({'Product Not Found': 'Invalid Product Code.'}, status=status.HTTP_400_BAD_REQUEST)

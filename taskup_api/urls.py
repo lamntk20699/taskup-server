@@ -4,7 +4,7 @@ from rest_framework_simplejwt import views as jwt_views
 from .views import (UserView, IssueView, IssueListView, ProjectListView,
                     ProjectView, LabelView, Project, UndefinedView, IssueArchiveView, IssueSnoozeView,
                     IssueMoveView, LabelListView, MemberListView, MemberIssueView, IssueStatusView,
-                    IssuePriorityView, UserSearchView, IssueTodoView)
+                    IssuePriorityView, UserSearchView, IssueTodoView, IssueSearchView)
 
 urlpatterns = [
     # issue
@@ -12,8 +12,8 @@ urlpatterns = [
     path('<str:objectId>/issues/', IssueListView.as_view(), name="create-issue-and-get-list-issue-in-project"), # getListIssue()
     path('snooze_issue/<str:issueId>/', IssueSnoozeView.as_view(), name="snooze_issue"),
     path('archive_issue/<str:issueId>/', IssueArchiveView.as_view(), name="archive_issue"),
-    path('<str:objectId>/move_issue/<str:issueId>/', IssueMoveView.as_view(), name="archive_issue"),
-    path('<str:userMeId>/todo_issues/', IssueTodoView.as_view(), name="archive_issue"),
+    path('<str:objectId>/move_issue/<str:issueId>/', IssueMoveView.as_view(), name="move_issue"),
+    path('<str:meId>/todo_issues/', IssueTodoView.as_view(), name="todo_issue"),
 
     # project
     path('<str:objectId>/projects/', ProjectListView.as_view()), # tạo dự án mới hoặc lấy danh sách project của user
@@ -30,9 +30,10 @@ urlpatterns = [
 
     # search
     path('<str:companyId>/search_user/', UserSearchView.as_view()),
+    path('<str:companyId>/search_issue/', IssueSearchView.as_view()),
 
     # otherwise
     path('default_issue_status/', IssueStatusView.as_view()),
     path('default_issue_priorities/', IssuePriorityView.as_view()),
-    path('test/', UndefinedView.as_view())
+    # path('test/', UndefinedView.as_view())
 ]

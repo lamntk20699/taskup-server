@@ -167,21 +167,40 @@ def get_issue_and_hasIssue_response(listIssueIds, requestUserId):
     }
     return result
 
+def get_search_data_by_type(type, id, data):
+    result = {}
+    if type == "user":
+        result = {
+            "id": id,
+            "fullName": data.fullName,
+            "account": data.account,
+            # "avatar": "",
+            "email": data.email,
+        }
+    elif type == "issue":
+        result = {
+            "id": id,
+            "summary": data.summary,
+            "description": data.description,
+            "issueKey": data.projectKey,
+            "statusId": data.statusId,
+            # "statusType": data.typeId,
+            # "statusCategory": "",
+        }
+
+    return result
+
 def get_user_search_response(listQuery):
     searchItems = {}
     searchIds = []
+    type = "user"
 
     for userItem in listQuery:
         id = userItem.memberId
         searchIds.append(id)
         searchItems[id] = {
-            "data": {
-                "id": id,
-                "fullName": userItem.fullName,
-                "account": userItem.account,
-                # "avatar": "",
-                "email": userItem.email,
-            }
+            "type": type,
+            "data": get_search_data_by_type(type, id, userItem)
         }
 
     result = {
@@ -192,3 +211,27 @@ def get_user_search_response(listQuery):
     }
     return result
 
+def get_issue_search_response(listQuery):
+    searchItems = {}
+    searchIds = []
+    type = "issue"
+
+    for issueItem in listQuery:
+        id = issueItem.issueId
+        searchIds.append(id)
+        searchItems[id] = {
+            "type": type,
+            "data": get_search_data_by_type(type, id, issueItem)
+        }
+
+    result = {
+        "Search": searchItems,
+        "HasSearch": {
+            companyId: {
+                "itemIds": searchIds,
+                "total": len(searchIds),
+                "count": len(searchIds),
+            }
+        }
+    }
+    return result
