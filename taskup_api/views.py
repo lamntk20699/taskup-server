@@ -210,6 +210,21 @@ class IssueListView(generics.CreateAPIView):
                     data = IssueSerializer(issueItems).data
                     issueId = issueItems.issueId
                     hasIssueIds.append(issueId)
+                    issueHasUser = IssueHasUser.objects.filter(userId=meId, parentId=issueId)
+                    if issueHasUser.exists():
+                        issueRelatedData = issueHasUser[0]
+                        hasIssueItems[issueId] = {
+                            "data": {
+                                "inInbox": issueRelatedData.inInbox,
+                                "inTodo": issueRelatedData.inTodo,
+                                "inMyIssue": issueRelatedData.inMyIssue,
+                                "snoozedToTime": int(issueRelatedData.snoozedToTime),
+                                "snoozedFromTime": int(issueRelatedData.snoozedFromTime),
+                                "isArchived": issueRelatedData.isArchived,
+                                "isSnoozed": issueRelatedData.isSnoozed,
+                                "lastseen": int(issueRelatedData.lastseen),
+                            }
+                        }
                     issueData[issueId] = {
                         "data": data
                     }
@@ -275,7 +290,7 @@ class IssueListView(generics.CreateAPIView):
             hasIssueData[objectId] = {
                 "itemIds": sortedHasIssue,
                 "total": len(hasIssueIds),
-                "items": {},
+                "items": hasIssueItems,
                 "older204": True
             }
             dataResponse = {
